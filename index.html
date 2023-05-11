@@ -1,0 +1,189 @@
+<html>
+  <head>
+    <title>2022 FE 데브매칭</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="App">
+      <div class="SelectedLanguage">
+        <ul>
+          <li>JavaScript</li>
+          <li>Python</li>
+          <li>Elixir</li>
+          <li>Java</li>
+          <li>PHP</li>
+        </ul>
+      </div>
+      <form class="SearchInput">
+        <input
+          class="SearchInput__input"
+          type="text"
+          placeholder="프로그램 언어를 입력하세요."
+          value="Script"
+        />
+      </form>
+      <div class="Suggestion">
+        <ul>
+          <li class="Suggestion__item--selected">
+            Action<span class="Suggestion__item--matched">Script</span>
+          </li>
+          <li>Java<span class="Suggestion__item--matched">Script</span></li>
+          <li>Type<span class="Suggestion__item--matched">Script</span></li>
+          <li>Pure<span class="Suggestion__item--matched">Script</span></li>
+        </ul>
+      </div>
+    </main>
+  </body>
+  <script type="text/javascript">
+    this.cursorState = 0;
+    const updateValue = (event) => {
+      inputTxt = event.target.value;
+      localStorage.setItem("inputText", inputTxt);
+      if (inputTxt === "") {
+        ulInit(getUlByClassName("Suggestion"));
+        divGone("Suggestion");
+        return;
+      }
+      getLangList(inputTxt);
+    };
+    const ulInit = (ul) => {
+      var fc = ul.firstChild;
+      while (fc) {
+        ul.removeChild(fc);
+        fc = ul.firstChild;
+      }
+    };
+    const divGone = (divClassName) => {
+      var div = document.getElementsByClassName(divClassName)[0];
+      div.style.display = "none";
+    };
+    const divShow = (divClassName) => {
+      var div = document.getElementsByClassName(divClassName)[0];
+      div.style.display = "block";
+    };
+    const getUlByClassName = (className) => {
+      var ulComp = document.getElementsByClassName(className)[0].children[0];
+      return ulComp;
+    };
+    const initiRender = () => {
+      const inputField = document.querySelector("input");
+      if (inputField) inputField.focus();
+
+      inputField.addEventListener("input", updateValue);
+      inputField.value = "";
+
+      //ul 초기화
+      ulInit(getUlByClassName("SelectedLanguage"));
+      ulInit(getUlByClassName("Suggestion"));
+      divGone("Suggestion");
+
+      if (localStorage.getItem("selectedList")) {
+        var list = localStorage.getItem("selectedList").split(",");
+        for (var i = 0; i < list.length; i++) {
+          var li = document.createElement("li");
+          li.appendChild(document.createTextNode(list[i]));
+          getUlByClassName("SelectedLanguage").appendChild(li);
+        }
+      }
+    };
+    const getLangList = (inputTxt) => {
+      fetch(
+        `https://wr4a6p937i.execute-api.ap-northeast-2.amazonaws.com/dev/languages?keyword=${inputTxt}`
+      )
+        .then((response) => response.json())
+        .then((response) => {
+          var suggestionUl = getUlByClassName("Suggestion");
+          this.cursorState = 0;
+          if (response.length > 0) {
+            renderSearchList(suggestionUl, response);
+            divShow("Suggestion");
+          } else {
+            //초기화
+            ulInit(getUlByClassName("Suggestion"));
+            divGone("Suggestion");
+          }
+        });
+    };
+
+    const renderSearchList = (ul, list, searchTxt) => {
+      const listItemClicked = (e) => {
+        const idx = e.target.getAttribute("itemIdx");
+        const item = list[parseInt(idx)];
+        alert(item);
+
+        addItemToSelectedLang(getUlByClassName("SelectedLanguage"), item);
+      };
+      //ul 초기화
+      ulInit(ul);
+
+      if (list.length === 0 || !ul) return;
+      for (var i = 0; i < list.length; i++) {
+        var li = document.createElement("li");
+        li.appendChild(document.createTextNode(list[i]));
+        li.setAttribute("itemIdx", i);
+        li.addEventListener("click", listItemClicked); //마지막 li 에 click 이벤트를 넣는다. 리스트에서 text로 조회할 것이기 때문.
+        ul.appendChild(li);
+      }
+    };
+
+    const addItemToSelectedLang = (ul, text) => {
+      if (!ul || !text) return;
+
+      const MAX_SIZE = 5;
+      var existingList = Array.prototype.slice.call(ul.children);
+      existingList = existingList.map((item) => item.innerHTML);
+      var newList = [];
+      if (existingList.includes(text)) {
+        //순서바꾸기
+        newList = existingList.filter((item) => item !== text);
+        newList.push(text);
+      } else if (existingList.length === MAX_SIZE) {
+        //FIFO
+        newList = [...existingList];
+        newList.shift();
+        newList.push(text);
+      } else {
+        newList = [...existingList];
+        newList.push(text);
+      }
+      ulInit(ul);
+      for (var i = 0; i < newList.length; i++) {
+        var li = document.createElement("li");
+        li.appendChild(document.createTextNode(newList[i]));
+        ul.appendChild(li);
+      }
+      localStorage.setItem("selectedList", newList);
+    };
+    const renderCursoredList = (ul) => {
+      Array.prototype.slice
+        .call(ul.children)
+        .map((item) => item.classList.remove("Suggestion__item--selected"));
+      var li = ul.children[this.cursorState];
+      li.classList.add("Suggestion__item--selected");
+    };
+    window.onkeydown = (e) => {
+      var suggestionUl = getUlByClassName("Suggestion");
+      const listCount = suggestionUl.children.length;
+      if (listCount === 0) return;
+
+      if (e.code === "ArrowDown") {
+        if (this.cursorState >= listCount - 1) {
+          this.cursorState = 0;
+        } else this.cursorState += 1;
+        renderCursoredList(suggestionUl);
+      } else if (e.code === "ArrowUp") {
+        if (this.cursorState === 0) return;
+        this.cursorState -= 1;
+        renderCursoredList(suggestionUl);
+      } else if (e.code === "Enter") {
+        e.preventDefault();
+        addItemToSelectedLang(
+          getUlByClassName("SelectedLanguage"),
+          suggestionUl.children[this.cursorState].innerHTML
+        );
+        alert(suggestionUl.children[this.cursorState].innerHTML);
+      }
+    };
+    initiRender();
+  </script>
+</html>
